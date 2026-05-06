@@ -1,0 +1,63 @@
+run_name: linear_probe
+output_dir: results
+seed: 0
+deterministic: true
+device: cuda
+
+data:
+  synthetic: true
+  synthetic_n_train: 128
+  synthetic_n_val: 64
+  in_channels: 1
+  spatial_size: [96, 96, 96]
+  spacing: [1.5, 1.5, 1.5]
+  hu_window: [-1000.0, 400.0]
+  manifest: data/manifests/labels.csv
+  data_root: data/raw
+  train_ids: data/manifests/splits/train.txt
+  val_ids:   data/manifests/splits/val.txt
+  test_ids:  data/manifests/splits/test.txt
+
+model:
+  kind: linear_probe
+  n_classes: 2
+  widths: [16, 32, 64, 128]
+  dropout: 0.2
+  feature_dim: 128
+  # ---- Backbone selection ----
+  # `random_init` for CI / dev. Switch to `3dino` or `spectre` once
+  # you've downloaded the corresponding pretrained weights.
+  backbone: random_init
+  checkpoint_path: null
+
+  # ---- 3DINO-specific (used when backbone == "3dino") ----
+  # Clone https://github.com/AICONSlab/3DINO and put its path here, OR
+  # set the OMNICT_3DINO_REPO env var. Download teacher_checkpoint.pth
+  # from https://huggingface.co/AICONSlab/3DINO-ViT.
+  # repo_path: /path/to/3DINO
+  # config_name: train/vit3d_highres
+  # expected_size: [112, 112, 112]
+  # feature_dim: 1024  # 3DINO-ViT-Large CLS token
+
+  # ---- SPECTRE-specific (used when backbone == "spectre") ----
+  # `pip install spectre-fm`. Weights ship with the package config.
+  # model_name: spectre-large-pretrained
+  # patch_size: [128, 128, 64]
+  # grid_size:  [3, 3, 4]
+  # feature_dim: 1024
+
+  head_hidden: 256
+  head_dropout: 0.2
+  lora:
+    r: 8
+    alpha: 16
+    dropout: 0.05
+    target_substrings: [attn, mlp, qkv, proj]
+
+train:
+  epochs: 20
+  batch_size: 8
+  num_workers: 2
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  grad_clip: 1.0

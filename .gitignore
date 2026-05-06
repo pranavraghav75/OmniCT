@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+*.envrc
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Data — never commit raw CT volumes / large artifacts
+data/raw/
+data/processed/
+data/cache/
+data/*.nii*
+data/*.dcm
+data/*.zip
+data/*.tar*
+data/*/*.nii*
+data/*/*.dcm
+!data/README.md
+!data/manifests/
+
+# Results — keep small logs, ignore big checkpoints / heatmaps
+results/checkpoints/
+results/wandb/
+results/runs/
+results/*.pt
+results/*.pth
+results/*.ckpt
+results/**/*.pt
+results/**/*.pth
+results/**/*.ckpt
+!results/.gitkeep
+!results/figures/
+!results/tables/
+
+# HuggingFace / torch caches
+.cache/
+hf_home/
+torch_home/
