@@ -33,8 +33,10 @@ OmniCT/
 │   ├── data/              # preprocessing transforms + torch Dataset
 │   ├── models/            # baselines, foundation-model wrappers, LoRA head
 │   ├── training/          # train loop, eval, metrics
+│   ├── explain/           # saliency / 3D Grad-CAM (localization)
 │   └── utils/             # seeding, config loading, logging
 ├── experiments/           # shell scripts to reproduce each main result
+├── report/                # NeurIPS LaTeX paper source + figures + tables
 ├── results/               # logs, figures, tables (checkpoints gitignored)
 └── notebooks/             # optional exploratory notebooks
 ```
@@ -92,6 +94,10 @@ bash experiments/run_lora.sh
 # Figure 2 — diagnostic / analysis experiment (data-efficiency curve)
 bash experiments/run_data_efficiency.sh
 
+# Figure 3 — saliency / 3D Grad-CAM panel (localization, addresses
+# the project-feedback recommendation to provide a localization signal)
+bash experiments/run_saliency.sh
+
 # All of the above (3 seeds each)
 bash experiments/run_all.sh
 ```
@@ -111,7 +117,17 @@ python -m src.training.make_figures      --runs_dir results/ --out results/figur
 | 3D CNN baseline       | 1 × A100 40GB    | ~45 min / seed      |
 | Linear probe          | 1 × A100 40GB    | ~20 min / seed      |
 | LoRA fine-tune        | 1 × A100 40GB    | ~1.5 hr / seed      |
+| Saliency panel        | 1 × GPU (any)    | <2 min              |
 | Full reproduction (3 seeds, all rows) | 1 × A100 | ~10 hr |
+
+## 6.1 Report
+
+The NeurIPS-formatted final report lives in `report/`. All 7 required
+sections (Intro, Related Work, Method, Experiments, Analysis,
+Discussion, Conclusion) are pre-stubbed with content seeded from the
+project proposal; search `\TODO{}` in `report/main.tex` to find every
+remaining drafting task. Build with `make -C report` (requires
+`pdflatex` + `bibtex`).
 
 ## 7. Reproducibility
 

@@ -1,8 +1,5 @@
 """Aggregate per-run `metrics.json` files into a single CSV with mean/std
-across seeds for each (run_group) — used to produce Table 1 of the paper.
-
-Run name convention assumed: `<group>_seed<n>`, e.g. `cnn3d_seed0`.
-"""
+across seeds for each (run_group) — used to produce Table 1 of the paper."""
 
 from __future__ import annotations
 
