@@ -102,11 +102,20 @@ def build_model(cfg) -> nn.Module:
             alpha=int(cfg.model.lora.alpha),
             dropout=float(cfg.model.lora.dropout),
         )
-        for name, p in encoder.named_parameters():
-            if name.endswith(".A") or name.endswith(".B"):
+        if n_lora == 0:
+            # No `nn.Linear` layers in the encoder matched the target
+            # substrings (e.g., a pure-conv backbone like the random_init
+            # SmallCNN3D has no qkv/proj/mlp/attn modules). Falling back
+            # to full end-to-end fine-tuning so this config is still a
+            # meaningful contrast with the frozen linear-probe baseline.
+            for p in encoder.parameters():
                 p.requires_grad_(True)
-            else:
-                p.requires_grad_(False)
+        else:
+            for name, p in encoder.named_parameters():
+                if name.endswith(".A") or name.endswith(".B"):
+                    p.requires_grad_(True)
+                else:
+                    p.requires_grad_(False)
 
         head = MLPHead(
             feature_dim=encoder.feature_dim,

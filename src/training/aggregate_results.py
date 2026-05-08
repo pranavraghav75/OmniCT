@@ -47,6 +47,12 @@ def main() -> None:
             rec[f"{metric}_std"] = stdev(values) if len(values) > 1 else 0.0
         records.append(rec)
 
+    if not records:
+        print(
+            f"[aggregate] no runs matching <name>_seed<N> with split={args.split!r} "
+            f"found under {args.runs_dir}/. Nothing to write."
+        )
+        return
     df = pd.DataFrame(records).sort_values("group")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(args.out, index=False)

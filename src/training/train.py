@@ -115,6 +115,29 @@ def _evaluate(model, loader, device) -> dict[str, float]:
     return compute_classification_metrics(ys, ps)
 
 
+def _check_real_data_inputs(cfg, logger) -> None:
+    """Fail fast with a useful message if the user asked for real data
+    but the manifest / split files are missing (the most common cause of
+    silent crashes during dataset construction)."""
+    if bool(cfg.data.synthetic):
+        return
+    manifest = Path(cfg.data.manifest)
+    if not manifest.exists():
+        msg = (
+            f"data.synthetic=false but manifest CSV is missing: {manifest}\n"
+            "  Run the dataset download first, e.g.:\n"
+            "    python data/download_medmnist.py --out data/raw  (recommended)\n"
+            "    python data/download_flare.py --out data/raw --max_volumes 200 --balance\n"
+            "  Or set data.synthetic=true to run on synthetic data."
+        )
+        logger.error(msg)
+        raise FileNotFoundError(msg)
+    for k in ("train_ids", "val_ids", "test_ids"):
+        p = Path(getattr(cfg.data, k))
+        if not p.exists():
+            logger.warning("data.%s does not exist (%s); using all rows from manifest.", k, p)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, type=str)
@@ -131,12 +154,21 @@ def main() -> None:
     logger.info("Run: %s", run_name)
     logger.info("Output dir: %s", out_dir)
 
+    try:
+        _run(cfg, run_name, out_dir, logger)
+    except Exception:
+        logger.exception("Training failed with an unhandled exception.")
+        raise
+
+
+def _run(cfg, run_name, out_dir, logger) -> None:
     set_seed(int(cfg.seed), deterministic=bool(cfg.deterministic))
     save_config(cfg, out_dir / "config.yaml")
 
     device = torch.device(cfg.device if torch.cuda.is_available() or cfg.device == "cpu" else "cpu")
     logger.info("Using device: %s", device)
 
+    _check_real_data_inputs(cfg, logger)
     train_loader, val_loader, test_loader = _build_dataloaders(cfg)
     logger.info("Datasets — train=%d, val=%d, test=%s",
                 len(train_loader.dataset),
