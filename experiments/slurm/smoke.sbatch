@@ -36,7 +36,14 @@ module purge || true
 module load python
 source .venv/bin/activate
 
-python -c "import torch; print('torch', torch.__version__, 'cuda available?', torch.cuda.is_available(), 'device count:', torch.cuda.device_count())"
+# `module load python` injects the system spack site-packages into
+# PYTHONPATH, which leaks ancient sympy / numpy into our venv and
+# breaks torch. Strip everything system-Python so only the venv is
+# searched.
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
+
+python -c "import torch, sympy; print('torch', torch.__version__, 'sympy', sympy.__version__, 'cuda?', torch.cuda.is_available(), 'gpus:', torch.cuda.device_count())"
 
 # Tiny synthetic-data run on a real GPU; verifies CUDA + the whole
 # training loop end-to-end. Should finish in <1 min.

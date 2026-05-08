@@ -25,7 +25,11 @@ module purge || true
 module load python
 source .venv/bin/activate
 
-python -c "import torch; print('torch', torch.__version__, 'cuda available?', torch.cuda.is_available(), 'device count:', torch.cuda.device_count())"
+# Isolate from system Python (see smoke.sbatch).
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
+
+python -c "import torch, sympy; print('torch', torch.__version__, 'sympy', sympy.__version__, 'cuda?', torch.cuda.is_available(), 'gpus:', torch.cuda.device_count())"
 
 python -m src.training.train \
     --config src/configs/baseline_cnn3d.yaml \

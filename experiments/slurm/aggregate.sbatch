@@ -21,6 +21,8 @@ mkdir -p results/tables
 module purge || true
 module load python
 source .venv/bin/activate
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
 
 python -m src.training.aggregate_results \
     --runs_dir results \

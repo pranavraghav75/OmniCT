@@ -40,8 +40,16 @@ fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
+# Isolate from the system spack Python — `module load python` puts
+# its site-packages on PYTHONPATH, which leaks an ancient sympy into
+# our venv and breaks torch._dynamo.
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
+
 echo "[setup] Upgrading pip ..."
 pip install --upgrade pip wheel
+# Pin a sympy new enough for torch >= 2.5 (needs equal_valued).
+pip install --upgrade "sympy>=1.13"
 
 # Install a CUDA build of torch matching Zaratan's CUDA. The cu121 wheels
 # work on both A100 and H100 nodes. If you hit a mismatch, swap to

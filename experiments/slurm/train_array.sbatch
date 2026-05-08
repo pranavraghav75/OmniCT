@@ -37,6 +37,8 @@ echo "[array] config=${CONFIG} run_name=${RUN_NAME}"
 module purge || true
 module load python
 source .venv/bin/activate
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
 
 python -m src.training.train \
     --config "${CONFIG}" \

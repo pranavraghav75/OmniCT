@@ -28,6 +28,8 @@ cd "${SLURM_SUBMIT_DIR}"
 module purge || true
 module load python
 source .venv/bin/activate
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
 
 python -m src.explain.run_saliency \
     --config "${CONFIG}" \

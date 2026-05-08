@@ -43,6 +43,13 @@ module load python
 
 source .venv/bin/activate
 
+# `module load python` injects the system spack site-packages into
+# PYTHONPATH, which leaks ancient sympy / numpy into our venv and
+# breaks torch. Strip everything system-Python so only the venv is
+# searched.
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
+
 python -m src.training.train \
     --config "${CONFIG}" \
     --override "seed=${SEED}" "device=cuda" ${EXTRA_OVERRIDES} \
