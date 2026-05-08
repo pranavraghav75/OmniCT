@@ -25,8 +25,8 @@
 \newcommand{\TODO}[1]{\textcolor{red}{[TODO: #1]}}
 \newcommand{\PLACE}[1]{\textcolor{gray}{#1}}
 
-\title{OmniCT: Parameter-Efficient Fine-Tuning of {3D} Medical
-  Foundation Models for Multi-Organ Malignancy Detection}
+\title{OmniCT: Parameter-Efficient Adaptation of {3D} CT Models for
+  Lung Nodule Malignancy Detection}
 
 \author{%
   Emily Wang \quad Annika Wong \quad Alec Zhou \quad Pranav Raghavan \\
@@ -42,15 +42,15 @@
 \begin{abstract}
 \TODO{Write last. 4--6 sentences. Template:}
 \PLACE{(1) Why CT misinterpretation matters and what we want.
-(2) Existing 3D foundation models are organ- or modality-specific.
-(3) We adapt 3DINO/SPECTRE-style features with a parameter-efficient
-LoRA head and a multi-organ classification setup.
-(4) On a stratified subset of the CVPR'26 General CT Image Diagnosis
-benchmark, our method achieves $X$ ROC-AUC (vs.\ $Y$ for a from-scratch
-3D CNN and $Z$ for a frozen-feature linear probe), with $K\times$ fewer
-trainable parameters than full fine-tuning.
-(5) Saliency maps qualitatively localize lesion regions consistent with
-ground-truth annotations.
+(2) We study practical adaptation strategies for 3D CT classification under
+class-project compute budgets.
+(3) We compare a class-prior baseline, a from-scratch 3D CNN, a frozen-feature
+linear probe, and a parameter-efficient adaptation recipe (LoRA-style; when the
+backbone lacks target Linear modules we fall back to end-to-end fine-tuning).
+(4) On NoduleMNIST3D, our best method achieves $\sim$0.92 test ROC-AUC with three
+seeds, outperforming a trivial prior and exposing a failure mode of frozen
+untrained features.
+(5) Saliency maps qualitatively localize discriminative regions.
 (6) Code, configs, and reproduction scripts are released at
 \url{https://github.com/pranavraghav75/OmniCT}.}
 \end{abstract}
@@ -85,13 +85,10 @@ must either fine-tune one of these encoders on hundreds of millions of
 weights---infeasible for most academic compute budgets---or fall back to
 a separately trained per-organ model.
 
-\paragraph{Our problem.} Given a 3D CT volume, predict whether a
-clinically significant malignant finding is present. We restrict the
-positive label to ``any malignant lesion in any of the organs covered
-by our training distribution'', framing it as binary classification
-following the achievable plan in our project proposal and the
-suggestion of our course feedback to begin with binary before
-attempting multi-label classification.
+\paragraph{Our problem.} Given a 3D CT volume, predict whether a lung
+nodule is malignant. We frame this as binary classification, following
+the course guidance to begin with a well-controlled binary setup before
+attempting multi-label or multi-organ extensions.
 
 \paragraph{Contributions.}
 \begin{itemize}
@@ -179,56 +176,36 @@ that a malignant lesion is present somewhere in the input volume.
 \subsection{Preprocessing pipeline}
 \label{sec:preproc}
 
-Following~\citet{isensee2021_nnunet} and motivated
-by~\citet{thakral2025_lowdose}, every CT volume passes through a
-deterministic, MONAI-implemented~\citep{cardoso2022_monai} pipeline:
-\begin{enumerate}
-\item \textbf{Reorientation} to RAS so anatomical axes are consistent.
-\item \textbf{Isotropic resampling} to a voxel spacing of
-  $1.5 \times 1.5 \times 1.5\,\text{mm}^3$ (we ablate spacing
-  in~\S\ref{sec:analysis}).
-\item \textbf{Hounsfield-Unit clipping} to $[-1000, 400]$, a
-  soft-tissue window that suppresses bone/air noise while preserving
-  lesion-relevant attenuation contrast.
-\item \textbf{Linear normalization} to $[0, 1]$.
-\item \textbf{Foreground crop + spatial pad} to a fixed input size that
-  matches each backbone's expected resolution (\TODO{state final size,
-  e.g., $112^3$ for 3DINO, $384\!\times\!384\!\times\!256$ for SPECTRE}).
-\end{enumerate}
-At training time we additionally apply random spatial crops, axis-flip,
-and small intensity jitter for augmentation; evaluation uses a
-deterministic center crop.
+Every CT volume passes through a lightweight MONAI
+pipeline~\citep{cardoso2022_monai}: (i) load the NIfTI volume,
+(ii) ensure channel-first, (iii) apply a soft-tissue Hounsfield-Unit
+window ($[-1000, 400]$) and normalize to $[0,1]$, and (iv) trilinear
+resize to a fixed input size for batching (we use $32^3$ for
+NoduleMNIST3D). At training time we add random left-right flips, random
+90-degree axial rotations, and small intensity jitter; evaluation is
+deterministic.
 
 \subsection{Backbone encoders}
 \label{sec:backbones}
 
-We use the same $\phi(\cdot)$-as-frozen-encoder abstraction across two
-backbones:
-\textbf{3DINO-ViT-Large}~\citep{xu2025_3dino} and
-\textbf{SPECTRE-ViT-Large}~\citep{claessens2025_spectre}.
-Both produce a $1024$-dimensional volume-level feature vector after
-spatial pooling.
-We additionally include a \textbf{from-scratch SmallCNN3D} (4-block
-strided convolutional network) trained directly from random
-initialization, so that the gain from pretraining can be isolated.
+We include a \textbf{from-scratch SmallCNN3D} (4-block strided
+convolutional network) trained directly from random initialization. We
+also evaluate a \textbf{frozen-feature} setup where a backbone is held
+fixed and only a classifier head is trained.
 
 \subsection{Adaptation strategies}
 \label{sec:adapt}
 
-For each backbone we evaluate three adaptation regimes (cf.\ Table~\ref{tab:main}):
+We evaluate four adaptation regimes (Table~\ref{tab:main}):
 \begin{description}
 \item[\textbf{Linear probe.}] $\phi$ is fully frozen; only a single
   linear classifier $W \in \mathbb{R}^{1024 \times 2}$ is trained on top
   of $\phi(x)$. This mirrors~\citet{pai2024_cancer_fm}.
-\item[\textbf{LoRA fine-tune.}] We inject low-rank updates into every
-  linear layer in the encoder's attention ($qkv$, $\text{proj}$) and MLP
-  ($fc_1$, $fc_2$) blocks. With rank $r{=}8$ and $\alpha{=}16$, only
-  $\sim$\TODO{trainable count} parameters are updated.
-  Mathematically, each adapted linear becomes
-  $y = Wx + \tfrac{\alpha}{r} B(Ax)$ with
-  $A \!\in\! \mathbb{R}^{r \times \mathrm{in}}$,
-  $B \!\in\! \mathbb{R}^{\mathrm{out} \times r}$, and $B$ initialized to
-  zero so the model starts as the pretrained encoder.
+\item[\textbf{LoRA / fine-tune.}] We attempt to inject low-rank updates
+  (LoRA) into targeted Linear modules. If the backbone does not contain
+  any matching Linear layers (e.g., a pure convolutional backbone), we
+  fall back to end-to-end fine-tuning for a meaningful contrast with the
+  frozen-feature linear probe.
 \item[\textbf{From-scratch.}] Full training of SmallCNN3D, no
   pretraining used---an upper bound on what raw supervision can give in
   our compute budget.
@@ -259,15 +236,10 @@ signal.
 
 \subsection{Datasets and splits}
 
-We use a stratified subset of the CVPR'26 Workshop on General CT Image
-Diagnosis dataset, drawn from
-\texttt{kmin06/CVPR26-3DCTFMCompetition} and
-\texttt{FLARE-MedFM/FLARE-Task4-CT-FM}.\footnote{%
-\url{https://huggingface.co/datasets/FLARE-MedFM/FLARE-Task4-CT-FM},
-\url{https://huggingface.co/datasets/kmin06/CVPR26-3DCTFMCompetition}}
-We sub-sample \TODO{N (e.g., 1000)} volumes balanced across organs and
-labels. Splits are patient-disjoint and stratified by (organ, label),
-in a $70/15/15$ train/val/test ratio.
+We evaluate on \textbf{NoduleMNIST3D}, a public 3D CT lung nodule
+malignancy benchmark (1633 volumes; official split: 1158/165/310
+train/val/test). We use the provided split files and report test-set
+metrics averaged over three random seeds.
 
 \subsection{Baselines and metrics}
 
@@ -287,35 +259,28 @@ and is contained in $\sim$80 lines of Python in \texttt{src/models/lora.py}.
 \subsection{Main results}
 
 \begin{table}[t]
-  \caption{Test-set classification performance on the OmniCT
-    multi-organ malignancy task. Mean $\pm$ std over three seeds.
-    Trainable params reported as the number of parameters with
-    \texttt{requires\_grad=True}.}
+  \caption{Test-set performance on NoduleMNIST3D. Mean $\pm$ std over
+    three seeds.}
   \label{tab:main}
   \centering
   \small
-  \begin{tabular}{l r r r r}
+  \begin{tabular}{l r r r}
     \toprule
-    Method & \# trainable & ROC-AUC $\uparrow$ & F1 $\uparrow$ & Balanced Acc.\ $\uparrow$ \\
+    Method & ROC-AUC $\uparrow$ & F1 $\uparrow$ & Balanced Acc.\ $\uparrow$ \\
     \midrule
-    Class-prior baseline & 0          & \TODO{} & \TODO{} & \TODO{} \\
-    SmallCNN3D (scratch) & \TODO{}    & \TODO{} & \TODO{} & \TODO{} \\
-    \midrule
-    \multicolumn{5}{l}{\textbf{Frozen 3D foundation backbone}} \\
-    Linear probe (3DINO) & \TODO{}    & \TODO{} & \TODO{} & \TODO{} \\
-    Linear probe (SPECTRE) & \TODO{}  & \TODO{} & \TODO{} & \TODO{} \\
-    \midrule
-    \multicolumn{5}{l}{\textbf{Parameter-efficient fine-tuning (ours)}} \\
-    LoRA $(r{=}8)$ on 3DINO  & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
-    LoRA $(r{=}8)$ on SPECTRE & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+    Class-prior baseline & $0.500 \pm 0.000$ & $0.000 \pm 0.000$ & $0.500 \pm 0.000$ \\
+    SmallCNN3D (scratch) & $0.922 \pm 0.010$ & $0.717 \pm 0.032$ & $0.847 \pm 0.026$ \\
+    Linear probe (frozen) & $0.436 \pm 0.012$ & $0.000 \pm 0.000$ & $0.500 \pm 0.000$ \\
+    LoRA / fine-tune & $0.918 \pm 0.013$ & $0.705 \pm 0.016$ & $0.830 \pm 0.020$ \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\TODO{1--2 paragraphs of narrative once numbers exist. Hit:
-(a) does our LoRA variant beat the linear probe within error bars?
-(b) does any 3D-foundation-model variant beat the from-scratch CNN?
-(c) which backbone (3DINO vs.\ SPECTRE) gives stronger transfer?}
+\TODO{Write 1--2 paragraphs of narrative. Hit: (a) both learned models
+significantly outperform the class-prior baseline; (b) the frozen
+untrained-features linear probe fails (below random AUC), motivating
+representation learning; (c) LoRA/fine-tuning is competitive with the
+from-scratch CNN within error bars.}
 
 % =====================================================================
 \section{Analysis}
@@ -347,7 +312,7 @@ claim of~\citet{pai2024_cancer_fm}.}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.95\linewidth]{figures/saliency_panel.pdf}
+  \includegraphics[width=0.95\linewidth]{../results/saliency_panel-2.pdf}
   \caption{Per-volume saliency maps on three test cases. Top row:
     central axial slice. Middle row: gradient-times-input attribution.
     Bottom row: 3D Grad-CAM attribution overlaid on the slice. Hot
@@ -403,8 +368,8 @@ either (i) supervising attribution with a small set of segmentation
 masks or (ii) using attention-rollout on the ViT encoder.
 
 \paragraph{Ethics.}
-The training data we use is fully de-identified and obtained under the
-CVPR'26 workshop license. Our system is a decision-support tool: we
+The training data we use is derived from public, de-identified CT
+benchmarks. Our system is a decision-support tool: we
 output a probability and a saliency map, not a diagnosis, and the human
 radiologist remains the final authority. We caution that medical
 datasets routinely under-represent certain demographics; auditing for
