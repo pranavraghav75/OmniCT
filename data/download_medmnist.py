@@ -165,12 +165,15 @@ def main() -> None:
             # Write as NIfTI with identity affine; MONAI's loader treats
             # spacing as 1 mm isotropic which matches MedMNIST's layout.
             img = nib.Nifti1Image(vol, affine=np.eye(4))
-            rel = f"raw/{vid}.nii.gz"
-            nib.save(img, args.out.parent / rel)
+            # The manifest stores `path` relative to `data_root` (which the
+            # YAML configs set to `data/raw/`). So the path is just the
+            # filename — joining with data_root yields data/raw/<vid>.nii.gz.
+            filename = f"{vid}.nii.gz"
+            nib.save(img, args.out / filename)
 
             manifest_rows.append({
                 "volume_id": vid,
-                "path": rel,
+                "path": filename,
                 "label": int(y_all[k]),
                 "organ": "lung",
             })
