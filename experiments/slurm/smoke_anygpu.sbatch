@@ -1,27 +1,16 @@
 #!/usr/bin/env bash
-# Cheap GPU smoke test on Zaratan.
-#
-# We use the `gpu` partition (the `debug` partition is CPU-only) with
-# the *cheapest* GPU SLURM offers: a fractional 1/7 A100 (5 GB GPU
-# RAM, 7 SU/hr). If your allocation doesn't have access to fractional
-# A100s, the fallback is `--gres=gpu:1` (any GPU). The job is small —
-# 10 min walltime, ~2 GB GPU RAM in practice — so a fractional A100 is
-# more than enough.
-#
-# Submit:
-#   sbatch experiments/slurm/smoke.sbatch
-# Or, if fractional GPUs aren't available to your account:
-#   sbatch --gres=gpu:1 experiments/slurm/smoke.sbatch
+# Fallback smoke test — same as smoke.sbatch but requests "any GPU"
+# instead of a fractional A100. Use this if `smoke.sbatch` errors out
+# with "Requested node configuration is not available".
 
 #SBATCH --job-name=omnict-smoke
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:a100_1g.5gb:1
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:15:00
 #SBATCH --output=results/slurm-%x-%j.out
 #SBATCH --error=results/slurm-%x-%j.err
-# Uncomment + fill in if your account is not the default:
 # #SBATCH --account=your_class_account
 
 set -euo pipefail
@@ -38,8 +27,6 @@ source .venv/bin/activate
 
 python -c "import torch; print('torch', torch.__version__, 'cuda available?', torch.cuda.is_available(), 'device count:', torch.cuda.device_count())"
 
-# Tiny synthetic-data run on a real GPU; verifies CUDA + the whole
-# training loop end-to-end. Should finish in <1 min.
 python -m src.training.train \
     --config src/configs/baseline_cnn3d.yaml \
     --override "seed=0" "device=cuda" "train.epochs=1" \
