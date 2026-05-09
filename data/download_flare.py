@@ -1,6 +1,4 @@
-"""Download a (possibly stratified-subsampled) copy of the LUNA25
-lung-nodule malignancy classification subset of the CVPR'26 Workshop
-on General CT Image Diagnosis.
+"""(Legacy) Download a LUNA25 subset from the CVPR'26 workshop dataset.
 
 We use ``huggingface_hub.hf_hub_download`` rather than
 ``datasets.load_dataset`` because the upstream repository mixes

@@ -1,36 +1,8 @@
-"""Download NoduleMNIST3D and write it into OmniCT's standard layout.
+"""Download NoduleMNIST3D and write it into the project's layout.
 
-NoduleMNIST3D is a publicly available 3D CT lung-nodule malignancy
-benchmark (subset of LIDC-IDRI):
-
-    - 1633 volumes total (train: 1158, val: 165, test: 310)
-    - 28 x 28 x 28 voxels per volume (uint8 [0, 255])
-    - Binary classification: 0 = benign, 1 = malignant
-
-We use it as a drop-in replacement for the gated CVPR'26 LUNA25 mirror
-because it is small, public, and bulletproof to download. The clinical
-task is identical (binary lung nodule malignancy from CT).
-
-To match the rest of the OmniCT pipeline (which expects NIfTI files +
-HU-style intensity windows), this script:
-
-    1. Downloads the NoduleMNIST3D arrays via the ``medmnist`` package.
-    2. Linearly remaps voxel values [0, 255] -> [-1000, 400] HU so the
-       project-standard ``hu_window=[-1000, 400]`` normalization yields
-       a clean [0, 1] range. The mapping is a fixed linear transform
-       and identical for every volume, so it does not bias the
-       experiment between methods.
-    3. Saves each volume as ``data/raw/nodule_{idx:05d}.nii.gz``.
-    4. Writes ``data/manifests/labels.csv`` (volume_id, path, label,
-       organ) and ``data/manifests/splits/{train,val,test}.txt`` using
-       MedMNIST's official splits.
-
-Usage:
-    pip install medmnist
-    python data/download_medmnist.py --out data/raw
-
-    # Smaller / balanced subset for faster iteration:
-    python data/download_medmnist.py --out data/raw --max_per_split 200 --balance
+Writes NIfTI volumes into `data/raw/` plus:
+  - `data/manifests/labels.csv`
+  - `data/manifests/splits/{train,val,test}.txt`
 """
 
 from __future__ import annotations
@@ -57,7 +29,7 @@ def _imports():
             f"  underlying error: {e}"
         )
     try:
-        import nibabel as nib  # type: ignore
+        import nibabel as nib
     except Exception as e:
         raise SystemExit(
             "[error] could not import `nibabel`. Install it first:\n"
@@ -142,9 +114,9 @@ def main() -> None:
     counter = 0
     for hf_split, our_split in splits_to_load:
         ds = NoduleMNIST3D(split=hf_split, download=True, size=args.size)
-        x_all = ds.imgs            # shape (N, D, H, W) uint8 -- some versions ship (N, 1, D, H, W)
+        x_all = ds.imgs            
         y_all = np.array(ds.labels).reshape(-1).astype(int).tolist()
-        if x_all.ndim == 5:        # squeeze potential channel dim
+        if x_all.ndim == 5:        
             x_all = x_all[:, 0]
         n = len(x_all)
         idx_pool = list(range(n))
@@ -161,13 +133,8 @@ def main() -> None:
         for j, k in enumerate(idx_pool):
             vid = f"nodule_{counter:05d}"
             counter += 1
-            vol = _to_hu(x_all[k])           # (D, H, W) float32
-            # Write as NIfTI with identity affine; MONAI's loader treats
-            # spacing as 1 mm isotropic which matches MedMNIST's layout.
+            vol = _to_hu(x_all[k])          
             img = nib.Nifti1Image(vol, affine=np.eye(4))
-            # The manifest stores `path` relative to `data_root` (which the
-            # YAML configs set to `data/raw/`). So the path is just the
-            # filename — joining with data_root yields data/raw/<vid>.nii.gz.
             filename = f"{vid}.nii.gz"
             nib.save(img, args.out / filename)
 

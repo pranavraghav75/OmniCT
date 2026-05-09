@@ -1,6 +1,6 @@
 # OmniCT
 
-**One-line description**: Multi-organ malignancy classification from 3D CT volumes via parameter-efficient fine-tuning of pretrained 3D medical foundation models.
+**One-line description**: Lung nodule malignancy classification from 3D CT volumes, comparing simple baselines and parameter-efficient adaptation.
 
 CMSC 472 (Spring 2026) Final Project — Emily Wang, Annika Wong, Alec Zhou, Pranav Raghavan.
 
@@ -8,14 +8,13 @@ CMSC 472 (Spring 2026) Final Project — Emily Wang, Annika Wong, Alec Zhou, Pra
 
 ## 1. Project at a glance
 
-CT scans must be read by radiologists, and interpretive errors increase with shift length and scan volume (Hanna et al., 2018). We build **OmniCT**, a system that takes a 3D CT volume and predicts whether a malignant lesion is present, generalizing across multiple organ systems rather than being tied to a single anatomical region (as Merlin or 3DINO often are).
+CT scans must be read by radiologists, and interpretive errors increase with shift length and scan volume (Hanna et al., 2018). We build **OmniCT**, a small, reproducible study that takes a 3D CT volume and predicts whether a lung nodule is malignant.
 
 Our approach:
 
-1. **Standardized preprocessing** — Hounsfield Unit (HU) clipping and isotropic resampling (per nnU-Net conventions, Isensee et al. 2021).
-2. **Frozen 3D foundation-model encoder** (3DINO / SPECTRE / similar) producing a volume-level embedding.
-3. **Parameter-Efficient Fine-Tuning** — a lightweight LoRA-adapted classification head trained for binary malignancy classification.
-4. **Baselines** — class-prior, small from-scratch 3D CNN, and frozen-feature linear probe (à la Pai et al. 2024).
+1. **Preprocessing** — HU windowing to \([-1000, 400]\), normalization, and resizing.
+2. **Baselines** — class-prior, a small from-scratch 3D CNN, and a frozen-feature linear probe.
+3. **Adaptation** — a LoRA-style recipe; when the chosen backbone has no matching Linear modules, we fall back to end-to-end fine-tuning (documented in code and paper).
 
 Reported metrics: ROC-AUC, F1, Balanced Accuracy, mean ± std over 3 seeds.
 
@@ -61,38 +60,33 @@ GPU is strongly recommended. The pipeline runs CPU-only for smoke tests but is i
 
 ## 4. Data
 
-We use a subset of the CVPR 2026 General CT Image Diagnosis workshop datasets:
-
-- [FLARE-Task4-CT-FM](https://huggingface.co/datasets/FLARE-MedFM/FLARE-Task4-CT-FM)
-- [CVPR26-3DCTFMCompetition](https://huggingface.co/datasets/kmin06/CVPR26-3DCTFMCompetition)
-
-To download the subset we use:
+We use **NoduleMNIST3D** (public, small, no auth). Download and materialize the dataset into the project layout with:
 
 ```bash
-python data/download_flare.py --out data/raw --max_volumes 1000
+python data/download_medmnist.py --out data/raw
 ```
 
-This produces `data/raw/<volume_id>.nii.gz` files plus `data/manifests/labels.csv` (columns: `volume_id,organ,label`). See `data/README.md` for full instructions.
+This produces `data/raw/<volume_id>.nii.gz` plus `data/manifests/labels.csv` and split files. See `data/README.md`.
 
 ## 5. Reproducing main results
 
-Each command below writes to a separate sub-directory under `results/` and logs metrics to `results/<run_name>/metrics.json`.
+Each script below writes to `results/<run_name>/` and logs metrics to `results/<run_name>/metrics.json`.
 
 ```bash
 # Table 1, row 1 — class-prior baseline
-bash experiments/run_baseline_prior.sh
+bash experiments/run_baseline_prior.sh  # requires data download
 
 # Table 1, row 2 — small 3D CNN trained from scratch
-bash experiments/run_baseline_cnn3d.sh
+bash experiments/run_baseline_cnn3d.sh  # requires data download
 
 # Table 1, row 3 — frozen-feature linear probe
-bash experiments/run_linear_probe.sh
+bash experiments/run_linear_probe.sh    # requires data download
 
 # Table 1, row 4 — LoRA-adapted foundation model (main method)
-bash experiments/run_lora.sh
+bash experiments/run_lora.sh            # requires data download
 
 # Figure 2 — diagnostic / analysis experiment (data-efficiency curve)
-bash experiments/run_data_efficiency.sh
+bash experiments/run_data_efficiency.sh # optional
 
 # Figure 3 — saliency / 3D Grad-CAM panel (localization, addresses
 # the project-feedback recommendation to provide a localization signal)
@@ -106,19 +100,17 @@ After the runs complete:
 
 ```bash
 python -m src.training.aggregate_results --runs_dir results/ --out results/tables/main.csv
-python -m src.training.make_figures      --runs_dir results/ --out results/figures/
 ```
 
-## 6. Expected runtime & hardware
+## 6. Expected runtime & hardware (Colab)
 
-| Experiment            | Hardware         | Wall-clock (approx) |
-|-----------------------|------------------|---------------------|
-| Smoke test (CPU)      | any laptop       | ~2 min              |
-| 3D CNN baseline       | 1 × A100 40GB    | ~45 min / seed      |
-| Linear probe          | 1 × A100 40GB    | ~20 min / seed      |
-| LoRA fine-tune        | 1 × A100 40GB    | ~1.5 hr / seed      |
-| Saliency panel        | 1 × GPU (any)    | <2 min              |
-| Full reproduction (3 seeds, all rows) | 1 × A100 | ~10 hr |
+Typical end-to-end runtime for the full grid (3 seeds, 4 methods) is **~20–40 minutes on a Colab A100**, plus a few minutes for saliency generation.
+
+## 6.1 Colab
+
+We provide a Colab notebook that runs the full pipeline end-to-end:
+
+- `notebooks/colab_train.ipynb`
 
 ## 6.1 Report
 

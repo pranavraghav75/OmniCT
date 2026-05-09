@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Reproduce Table 1, Row 1 — class-prior baseline.
-# Trivial baseline: outputs the empirical training-set class prior.
-# 3 seeds for variance.
+# Class-prior baseline (3 seeds).
 set -euo pipefail
 
 CFG=src/configs/baseline_prior.yaml
@@ -10,5 +8,9 @@ for SEED in 0 1 2; do
   python -m src.training.train \
     --config "${CFG}" \
     --override "seed=${SEED}" \
+              "data.synthetic=false" \
+              "data.spatial_size=[32,32,32]" \
+              "data.spacing=[1.0,1.0,1.0]" \
+              "data.hu_window=[-1000.0,400.0]" \
     --run_name "prior_seed${SEED}"
 done

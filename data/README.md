@@ -1,12 +1,13 @@
 # Data
 
-This directory holds download scripts describing the splits we use. The following should be the
-layout after running the donload script:
+This directory holds dataset download scripts and manifests. After running a download script, the
+layout should look like:
 
 ```
 data/
 ├── README.md
 ├── download_flare.py          # downloads a subset from HuggingFace
+├── download_medmnist.py       # downloads NoduleMNIST3D (public; recommended)
 ├── manifests/
 │   ├── labels.csv             # volume_id, organ, label (0=benign, 1=malignant)
 │   ├── splits/
@@ -20,12 +21,29 @@ data/
     └── <volume_id>.pt
 ```
 
-We pull from the CVPR 2026 General CT Image Diagnosis workshop:
+## Recommended dataset: NoduleMNIST3D
+
+For the final report runs we use **NoduleMNIST3D**, a public 3D CT lung nodule malignancy
+benchmark (small, quick to download, no auth). Download + materialize the dataset with:
+
+```bash
+python data/download_medmnist.py --out data/raw
+```
+
+This writes:
+
+- `data/raw/*.nii.gz`
+- `data/manifests/labels.csv`
+- `data/manifests/splits/{train,val,test}.txt`
+
+## Optional / legacy: CVPR'26 workshop subset
+
+Earlier iterations attempted to pull from the CVPR 2026 General CT Image Diagnosis workshop:
 
 - `FLARE-MedFM/FLARE-Task4-CT-FM` — pretraining set, CT volumes
 - `kmin06/CVPR26-3DCTFMCompetition` — classification labels for the downstream task
 
-For the project, we use a stratified subset (default: 1000 volumes total, ~50/50 class split where possible, capped per-organ to avoid any bias). Download found below:
+We keep `download_flare.py` for reference, but the final report does not depend on it.
 
 ```bash
 python data/download_flare.py \
@@ -35,7 +53,7 @@ python data/download_flare.py \
     --seed 0
 ```
 
-The donwload_flare.py script has the following functionality:
+The `download_flare.py` script:
 1. Streams the HuggingFace dataset metadata
 2. Selects a stratified subset
 3. Downloads each NIfTI to `data/raw/`

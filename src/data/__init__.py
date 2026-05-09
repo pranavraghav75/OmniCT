@@ -1,25 +1,16 @@
-"""OmniCT data package.
+"""Datasets and transforms.
 
-`preprocessing` requires MONAI (heavy dependency). It's imported lazily
-so that synthetic / CI runs that don't touch real NIfTI files can avoid
-the import cost.
+We import MONAI transforms lazily so synthetic runs don't pay the import cost.
 """
 
 from .datasets import OmniCTDataset, SyntheticCTDataset
 
 
 def _patch_monai_max_seed() -> None:
-    """MONAI < 1.4 sets ``MAX_SEED = 2**32`` in
-    ``monai.utils.misc``/``monai.transforms.{compose,transform}``. On
-    NumPy 2.x, evaluating ``uint32_scalar % 2**32`` raises
-    ``OverflowError: Python integer 4294967296 out of bounds for uint32``
-    because ``2**32`` itself does not fit in ``uint32`` (max is
-    ``2**32 - 1``). Lowering ``MAX_SEED`` by 1 in every module that
-    holds a copy keeps every downstream call (``randint(MAX_SEED, ...)``,
-    ``_seed % MAX_SEED``) inside the uint32 range.
+    """Work around MONAI/NumPy2 seeding overflow.
 
-    Safe to call repeatedly. Called automatically the first time MONAI
-    transforms are imported through this package.
+    Some MONAI releases set MAX_SEED to 2**32, which does not fit in uint32
+    under NumPy 2.x. We clamp it to (2**32 - 1). Safe to call repeatedly.
     """
     try:
         import numpy as np

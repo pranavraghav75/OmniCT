@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reproduce Table 1, Row 2 — small 3D CNN trained from scratch.
+# SmallCNN3D trained from scratch (3 seeds).
 set -euo pipefail
 
 CFG=src/configs/baseline_cnn3d.yaml
@@ -8,5 +8,9 @@ for SEED in 0 1 2; do
   python -m src.training.train \
     --config "${CFG}" \
     --override "seed=${SEED}" \
+              "data.synthetic=false" \
+              "data.spatial_size=[32,32,32]" \
+              "data.spacing=[1.0,1.0,1.0]" \
+              "data.hu_window=[-1000.0,400.0]" \
     --run_name "cnn3d_seed${SEED}"
 done

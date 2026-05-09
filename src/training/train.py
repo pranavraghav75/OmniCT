@@ -1,17 +1,7 @@
-"""Training entry point.
+"""Train a model from a YAML config.
 
-Run:
-    python -m src.training.train \
-        --config src/configs/baseline_cnn3d.yaml \
-        --override seed=0 train.epochs=10
-
-This script:
-    1. Loads the YAML config and applies CLI overrides.
-    2. Seeds all RNGs.
-    3. Builds dataset, model, optimizer, scheduler.
-    4. Runs train/val loops, logging to stdout + a per-run log file.
-    5. On finish, runs the held-out evaluation and writes
-       `results/<run_name>/metrics.json` plus the resolved config.
+Example:
+  python -m src.training.train --config src/configs/baseline_cnn3d.yaml --override seed=0
 """
 
 from __future__ import annotations
@@ -64,14 +54,25 @@ def _build_dataloaders(cfg) -> tuple[DataLoader, DataLoader, DataLoader | None]:
             spatial_size=tuple(cfg.data.spatial_size),
         )
 
-        def _ids(path):
+        def _ids(path, frac: float | None = None):
             p = Path(path)
-            return p.read_text().strip().splitlines() if p.exists() else None
+            if not p.exists():
+                return None
+            ids = p.read_text().strip().splitlines()
+            if frac is None or frac >= 1.0:
+                return ids
+            if frac <= 0.0:
+                raise ValueError("data.train_frac_subsample must be in (0, 1].")
+            # Deterministic subsample for data-efficiency experiments.
+            rng = np.random.default_rng(int(cfg.seed))
+            k = max(2, int(round(len(ids) * float(frac))))
+            keep = rng.choice(len(ids), size=k, replace=False)
+            return [ids[i] for i in keep.tolist()]
 
         train_ds = OmniCTDataset(
             manifest=cfg.data.manifest,
             data_root=cfg.data.data_root,
-            split_ids=_ids(cfg.data.train_ids),
+            split_ids=_ids(cfg.data.train_ids, frac=float(cfg.data.get("train_frac_subsample", 1.0))),
             transform=train_tf,
         )
         val_ds = OmniCTDataset(
