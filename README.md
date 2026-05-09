@@ -1,8 +1,8 @@
 # OmniCT
 
-**One-line description**: Lung nodule malignancy classification from 3D CT volumes, comparing simple baselines and parameter-efficient adaptation.
+Lung nodule malignancy classification from 3D CT volumes, comparing simple baselines and parameter-efficient adaptation.
 
-CMSC 472 (Spring 2026) Final Project — Emily Wang, Annika Wong, Alec Zhou, Pranav Raghavan.
+CMSC 472 (Spring 2026) Final Project — Emily Wang, Annika Wong, Alec Zhou, Pranav Raghavan
 
 ---
 
